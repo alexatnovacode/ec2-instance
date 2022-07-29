@@ -11,6 +11,12 @@ Parameters:
     Default: "nvirginia-ec2-keypair"
     ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
 
+  CreationDate:
+    Description: Enter the date and time when this script is initiated
+    Type: String
+    Default: "2022-07-29T12:00"
+    ConstraintDescription: "Date and time of creation"
+
 Resources:
   EmpoweringRoleforEC2Server:
     Type: "AWS::IAM::Role"
@@ -66,7 +72,7 @@ Resources:
         - Key: Owner
           Value: aleksandar.stoisavljevic@novacode.rs
         - Key: Date
-          Value: 2022-07-29T12:00
+          Value: !Ref CreationDate
       UserData:
         Fn::Base64: |
           #! /bin/bash
