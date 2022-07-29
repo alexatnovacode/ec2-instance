@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  This CloudFormation Script creates EC2 Instance enabled with Docker and Docker Compose.
+  Same time it will create new SecurityGroup allowing ports HTTP(80, 8080) and SSH(22)
+  connecting from anywhere.
+
+Parameters:
+  KeyPairName:
+    Description: Enter the name of your Key Pair for SSH connections.
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "nvirginia-ec2-keypair"
+    ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
+
+Resources:
+  EmpoweringRoleforEC2Server:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - arn:aws:iam::aws:policy/AdministratorAccess
+  EC2ServerProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles: #required
+        - !Ref EmpoweringRoleforEC2Server
+
+  EC2InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP for Server
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0cff7528ff583bf9a
+      InstanceType: t3.small
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2ServerProfile
+      SecurityGroupIds:
+        - !GetAtt EC2InstanceSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: SimpleEC2Instance
+        - Key: Owner
+          Value: aleksandar.stoisavljevic@novacode.rs
+        - Key: Date
+          Value: 2022-07-29T12:00
+      UserData:
+        Fn::Base64: |
+          #! /bin/bash
+          # update os
+          yum update -y
+          # install docker
+          amazon-linux-extras install docker -y
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          # install docker compose
+          curl -L "https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+
+Outputs:
+  EC2InstanceDNS:
+    Description: Server DNS Name
+    Value: !Sub
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt EC2Instance.PublicDnsName
